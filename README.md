@@ -1,4 +1,4 @@
-# Notes App With Android Room Library
+# Notes App 
 
 
 ## Desciption
