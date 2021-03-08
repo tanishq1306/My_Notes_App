@@ -1,10 +1,12 @@
 package com.example.mynotesapp.ui
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
@@ -19,12 +21,18 @@ import kotlinx.android.synthetic.main.fragment_create_note.*
 import kotlinx.android.synthetic.main.fragment_home.*
 import kotlinx.android.synthetic.main.note_item_layout.*
 import kotlinx.coroutines.launch
+import pub.devrel.easypermissions.AppSettingsDialog
+import pub.devrel.easypermissions.EasyPermissions
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.jar.Manifest
 
-class CreateNote : BaseFragment() {
+class CreateNote : BaseFragment(), EasyPermissions.PermissionCallbacks, EasyPermissions.RationaleCallbacks {
     private var currentDate: String = ""
     private var noteId = -1
+    private var readPermissionStorage = 1
+    private var requestCodeImage = 2
+    private var selectedImagePath = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +78,13 @@ class CreateNote : BaseFragment() {
                             startActivity(intent)
                         }
                     }
+
+                    // image
+                    if (!notes.imgPath.isNullOrBlank()) {
+                        selectedImagePath = notes.imgPath!!
+                        imageNote.setImageBitmap(BitmapFactory.decodeFile(notes.imgPath))
+                        layoutImage.visibility = View.VISIBLE
+                    }
                 }
             }
         }
@@ -96,7 +111,7 @@ class CreateNote : BaseFragment() {
 
         add_image_path.setOnClickListener {
             // pick a image
-            Toast.makeText(context, "Add Image", Toast.LENGTH_SHORT).show()
+            readStorageTask()
         }
 
         add_link.setOnClickListener{
@@ -107,8 +122,14 @@ class CreateNote : BaseFragment() {
 
         delete_note.setOnClickListener {
             // delete note
-            Toast.makeText(context, "Note Deleted", Toast.LENGTH_SHORT).show()
             deleteNote()
+            Toast.makeText(context, "Note Deleted", Toast.LENGTH_SHORT).show()
+        }
+
+        imageDelete.setOnClickListener{
+            Toast.makeText(context, "Image Deleted", Toast.LENGTH_SHORT).show()
+            selectedImagePath = ""
+            layoutImage.visibility = View.GONE
         }
     }
 
@@ -130,6 +151,9 @@ class CreateNote : BaseFragment() {
                     if (imp_links.text.toString().isNotEmpty()) {
                         notes.webLink = imp_links.text.toString()
                     }
+                    if (!selectedImagePath.isNullOrBlank() && selectedImagePath.isNotEmpty()) {
+                        notes.imgPath = selectedImagePath
+                    }
 
                     context ?.let {
                         NotesDatabase.getDatabase(it).noteDao().insertNotes(notes)
@@ -137,6 +161,7 @@ class CreateNote : BaseFragment() {
                         etNoteTitle.setText("")
                         etNoteDesc.setText("")
                         if (imp_links.visibility == View.VISIBLE) imp_links.visibility = View.GONE
+                        if (layoutImage.visibility == View.VISIBLE) layoutImage.visibility = View.GONE
                         requireActivity().supportFragmentManager.popBackStack()
                     }
                 }
@@ -157,10 +182,15 @@ class CreateNote : BaseFragment() {
                     notes.webLink = imp_links.text.toString()
                 }
 
+                if (!selectedImagePath.isNullOrBlank() && selectedImagePath.isNotEmpty()) {
+                    notes.imgPath = selectedImagePath
+                }
+
                 NotesDatabase.getDatabase(it).noteDao().updateNote(notes)
                 etNoteTitle.setText("")
                 etNoteDesc.setText("")
                 if (imp_links.visibility == View.VISIBLE) imp_links.visibility = View.GONE
+                if (layoutImage.visibility == View.VISIBLE) layoutImage.visibility = View.GONE
                 requireActivity().supportFragmentManager.popBackStack()
             }
         }
@@ -177,7 +207,6 @@ class CreateNote : BaseFragment() {
 
     private fun replaceFragment(fragment: Fragment, isTransition:Boolean) {
         val fragmentTransition = activity!!.supportFragmentManager.beginTransaction()
-
         if (isTransition){
             fragmentTransition.setCustomAnimations(android.R.anim.slide_in_left,android.R.anim.slide_out_right)
         }
@@ -185,9 +214,97 @@ class CreateNote : BaseFragment() {
         fragmentTransition.add(R.id.frame_layout, fragment).addToBackStack(fragment.javaClass.simpleName).commit()
     }
 
+    override fun onDetach() {
+        super.onDetach()
+        requireActivity().supportFragmentManager.popBackStack()
+        replaceFragment(HomeFragment.newInstance(), false)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         requireActivity().supportFragmentManager.popBackStack()
         replaceFragment(HomeFragment.newInstance(), false)
     }
+
+    private fun hasReadStoragePermission():Boolean {
+        return EasyPermissions.hasPermissions(requireContext(), android.Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+
+    private fun pickImageFromGallery(){
+        var intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        if (intent.resolveActivity(requireActivity().packageManager) != null) {
+            startActivityForResult(intent, requestCodeImage)
+        }
+    }
+
+    private fun readStorageTask() {
+        if (hasReadStoragePermission()) {
+            pickImageFromGallery()
+        }
+        else {
+            EasyPermissions.requestPermissions(
+                    requireActivity(),
+                    getString(R.string.storage_permission_text),
+                    readPermissionStorage,
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+        }
+    }
+
+    private fun getPathFromUri(contentUri: Uri): String? {
+        var filePath:String? = null
+        var cursor = requireActivity().contentResolver.query(contentUri,null,null,null,null)
+        if (cursor == null) {
+            filePath = contentUri.path
+        }
+        else {
+            cursor.moveToFirst()
+            var index = cursor.getColumnIndex("_data")
+            filePath = cursor.getString(index)
+            cursor.close()
+        }
+
+        return filePath
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestCodeImage && resultCode == Activity.RESULT_OK){
+            if (data != null){
+                var selectedImageUrl = data.data
+                if (selectedImageUrl != null){
+                    try {
+                        var inputStream = requireActivity().contentResolver.openInputStream(selectedImageUrl)
+                        var bitmap = BitmapFactory.decodeStream(inputStream)
+                        imageNote.setImageBitmap(bitmap)
+                        layoutImage.visibility = View.VISIBLE
+                        selectedImagePath = getPathFromUri(selectedImageUrl)!!
+                    }catch (e:Exception){
+                        Toast.makeText(requireContext(),e.message,Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+            requestCode: Int,
+            permissions: Array<out String>,
+            grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, requireActivity())
+    }
+
+    override fun onPermissionsGranted(requestCode: Int, perms: MutableList<String>) { }
+
+    override fun onPermissionsDenied(requestCode: Int, perms: MutableList<String>) {
+        if (EasyPermissions.somePermissionPermanentlyDenied(requireActivity(), perms)){
+            AppSettingsDialog.Builder(requireActivity()).build().show()
+        }
+    }
+
+    override fun onRationaleAccepted(requestCode: Int) { }
+
+    override fun onRationaleDenied(requestCode: Int) { }
 }

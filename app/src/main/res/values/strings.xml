@@ -7,5 +7,6 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="web_url">web url</string>
     <string name="type_here">Type Here</string>
+    <string name="storage_permission_text">This app needs access to your storage.</string>
     <string name="add_links_here">Add Links Here</string>
 </resources>
