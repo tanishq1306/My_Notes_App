@@ -36,9 +36,11 @@ Room architecture can be defined as
 ### See All Notes
 <img src = "https://github.com/tanishq1306/My_Notes_App/blob/master/ss/see%20all%20notes.jpg" height = 520, width = 275>
 
-### Search For a Note
-<img src = "https://github.com/tanishq1306/My_Notes_App/blob/master/ss/search.jpg" height = 520, width = 275>
+### Add Images and Links
+<img src = "https://github.com/tanishq1306/My_Notes_App/blob/master/ss/add%20image%20and%20links.jpeg" height = 520, width = 275>
 
+### Search For a Note
+<img src = "https://github.com/tanishq1306/My_Notes_App/blob/master/ss/search.jpg" height=520, width = 275>
 
 -----------------------
 
