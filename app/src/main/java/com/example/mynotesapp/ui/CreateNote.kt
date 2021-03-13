@@ -1,6 +1,8 @@
 package com.example.mynotesapp.ui
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -20,6 +22,7 @@ import com.example.mynotesapp.database.NotesDatabase
 import kotlinx.android.synthetic.main.fragment_create_note.*
 import kotlinx.android.synthetic.main.fragment_home.*
 import kotlinx.android.synthetic.main.note_item_layout.*
+import kotlinx.coroutines.NonCancellable.cancel
 import kotlinx.coroutines.launch
 import pub.devrel.easypermissions.AppSettingsDialog
 import pub.devrel.easypermissions.EasyPermissions
@@ -63,7 +66,7 @@ class CreateNote : BaseFragment(), EasyPermissions.PermissionCallbacks, EasyPerm
         if (noteId != -1) {
             delete_note.visibility = View.VISIBLE
             launch {
-                context?.let {
+                context?.let { it ->
                     var notes = NotesDatabase.getDatabase(it).noteDao().getSpecificNote(noteId)
                     etNoteTitle.setText(notes.title)
                     etNoteDesc.setText(notes.noteText)
@@ -74,8 +77,23 @@ class CreateNote : BaseFragment(), EasyPermissions.PermissionCallbacks, EasyPerm
                         imp_links.setText(notes.webLink)
                         var url: String = notes.webLink!!
                         imp_links.setOnClickListener {
-                            var intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            startActivity(intent)
+                            val builder: AlertDialog.Builder? = activity?.let {
+                                AlertDialog.Builder(it)
+                            }
+
+                            builder?.setMessage("Go to $url")?.
+                                setPositiveButton("Yes",
+                                    DialogInterface.OnClickListener { _, _ ->
+                                    var intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    startActivity(intent)
+                                })?.setNegativeButton("No",
+                                    DialogInterface.OnClickListener { dialog, _ ->
+                                        // do nothing
+                                        imp_links.isClickable = false
+                                        dialog.cancel()
+                                })
+
+                            builder?.create()?.show()
                         }
                     }
 
@@ -252,7 +270,7 @@ class CreateNote : BaseFragment(), EasyPermissions.PermissionCallbacks, EasyPerm
     }
 
     private fun getPathFromUri(contentUri: Uri): String? {
-        var filePath:String? = null
+        var filePath: String?
         var cursor = requireActivity().contentResolver.query(contentUri,null,null,null,null)
         if (cursor == null) {
             filePath = contentUri.path

@@ -39,6 +39,16 @@ class NotesAdapter() :
         holder.itemView.textContent.text = arrList[position].noteText
         holder.itemView.textDateAndTime.text = arrList[position].dateTime
 
+        if (!arrList[position].imgPath.toString().isNullOrBlank()) {
+            holder.itemView.imgNote.setImageBitmap(BitmapFactory.decodeFile(arrList[position].imgPath))
+            holder.itemView.imgNote.visibility = View.VISIBLE
+        }
+
+        if (!arrList[position].webLink.toString().isNullOrBlank()) {
+            holder.itemView.webLink.text = arrList[position].webLink
+            holder.itemView.webLink.visibility = View.VISIBLE
+        }
+
         holder.itemView.layoutNote.setOnClickListener{
             listener!!.onClicked(arrList[position].id!!)
         }
